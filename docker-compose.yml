@@ -1,6 +1,38 @@
 version: '3.8'
 
 services:
+  # Redis
+  langgraph-redis:
+    image: redis:6
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      timeout: 1s
+      retries: 5
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:latest
+    container_name: langgraph-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-"evaluations-backs-lantern"}
+      POSTGRES_DB: langgraph-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
   # Single API service with dynamic environment
   app:
     build:
@@ -13,14 +45,17 @@ services:
       - ./app:/app/app
       - ./logs:/app/logs
     env_file:
-      - .env.${APP_ENV:-development}
+      - .env
     environment:
-      - APP_ENV=${APP_ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
       # Pass sensitive variables at runtime
-      - LLM_API_KEY=${LLM_API_KEY:-dummy-key-for-development}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeythatshouldbechangedforproduction}
+      LLM_API_KEY: ${LLM_API_KEY:-dummy-key-for-development}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-supersecretkeythatshouldbechangedforproduction}
+      # Add PostgreSQL connection details
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-"evaluations-backs-lantern"}
+      POSTGRES_URL: postgresql://postgres:evaluations-backs-lantern@postgres:5432/langgraph-postgres
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -30,7 +65,11 @@ services:
     restart: on-failure
     networks:
       - monitoring
+    depends_on:
+      postgres:
+        condition: service_healthy
 
+  # Prometheus and Grafana services remain unchanged
   # Prometheus
   prometheus:
     image: prom/prometheus:latest
@@ -52,8 +91,8 @@ services:
     volumes:
       - grafana-storage:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
     networks:
       - monitoring
     restart: always
@@ -63,4 +102,6 @@ networks:
     driver: bridge
 
 volumes:
-  grafana-storage: 
+  grafana-storage:
+  postgres-data:
+    driver: local

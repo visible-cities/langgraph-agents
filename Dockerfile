@@ -4,7 +4,7 @@ FROM python:3.13.2-slim
 WORKDIR /app
 
 # Set non-sensitive environment variables
-ARG APP_ENV=production
+ARG APP_ENV=development
 ARG POSTGRES_URL
 
 ENV APP_ENV=${APP_ENV} \
@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy pyproject.toml first to leverage Docker cache
 COPY pyproject.toml .
-RUN uv venv && . .venv/bin/activate && uv pip install -e .
+RUN uv venv && . .venv/bin/activate && uv pip install -e . && uv pip install --no-binary :all: psycopg
 
 # Copy the application
 COPY . .

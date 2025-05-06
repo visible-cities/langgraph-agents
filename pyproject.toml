@@ -32,6 +32,9 @@ dependencies = [
     "langchain-community>=0.3.20",
     "tqdm>=4.67.1",
     "colorama>=0.4.6",
+    "trustcall>=0.0.39",
+    "langchain-anthropic>=0.3.12",
+    "langchain-postgres>=0.0.14",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +47,9 @@ dev = [
 ]
 
 [dependency-groups]
+dev = [
+    "black>=25.1.0",
+]
 test = [
     "httpx>=0.28.1",
     "pytest>=8.3.5",
